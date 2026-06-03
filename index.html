@@ -243,13 +243,12 @@ input[type=range]{flex:1;accent-color:var(--accent);height:4px}
         <option value="drag">Drag (20 PSI)</option>
       </select>
     </div>
-    <div class="card-title" style="margin-bottom:4px">Front weight % — from Mech. Balance × 100</div>
+    <div class="card-title" style="margin-bottom:4px">Front weight % — read directly from the in-game stats menu</div>
     <div class="slider-row">
-      <label>Front</label>
-      <input type="range" min="20" max="80" step="1" value="50" id="fw-slider">
-      <span class="badge" id="fw-val">50%</span>
-      <label>Rear</label>
-      <span class="badge rear" id="rw-val">50%</span>
+      <div class="fg" style="flex:1"><label>Front weight %</label><input type="number" id="fw-input" placeholder="e.g. 40" min="10" max="90" step="0.1" oninput="calc()"></div>
+      <span class="badge" id="fw-val">—</span>
+      <span style="font-size:11px;color:var(--muted)">Rear</span>
+      <span class="badge rear" id="rw-val">—</span>
     </div>
   </div>
 
@@ -494,13 +493,18 @@ function setRes(id,val,dp){
 function getWeightKg(){const w=vn('car-weight'),u=$('weight-unit').value;if(isNaN(w)||w<=0)return null;return u==='lbs'?w*0.453592:w}
 function wFactor(){const kg=getWeightKg();return kg===null?0.5:clamp((kg-700)/1300,0,1)}
 function getPower(){const p=vn('car-power');return isNaN(p)||p<=0?null:p}
-function getFW(){return vn('fw-slider')/100}
+function getFW(){const v=vn('fw-input');return isNaN(v)?null:clamp(v/100,0.1,0.9)}
+// raw power-to-weight in hp/kg (e.g. 1191/963 = 1.24)
+function pwRatio(){
+  const hp=getPower(),kg=getWeightKg();
+  if(!hp||!kg)return null;
+  return hp/kg;
+}
 // power-to-weight ratio normalised 0(low)-1(high); ~0.5 is moderate
 function pwFactor(){
-  const hp=getPower(),kg=getWeightKg();
-  if(!hp||!kg)return 0.5;
-  const pw=hp/kg; // hp per kg
-  return clamp((pw-0.15)/0.45,0,1); // 0.15=tame, 0.60=very punchy
+  const pw=pwRatio();
+  if(pw===null)return 0.5;
+  return clamp((pw-0.15)/0.85,0,1); // 0.15=tame, 1.0=extreme (was 0.60 cap, now scales to ~1.0+ hp/kg)
 }
 
 function tyrePSI(){
@@ -550,9 +554,9 @@ const NOTES={
     arb:'<b>Guide:</b> RWD baseline ~20 front / 55 rear. Softer front ARB = more front grip. <span class="why">Why: a stiffer bar overloads the outside tyre on that axle, so a softer front keeps front grip and fights understeer.</span><br>Fix the end with the problem — understeer → soften front, oversteer → soften rear.',
     springs:'<b>Guide:</b> ⅓–½ of range, heavier axle stiffer. <span class="why">Why: the heavier end needs more spring to control its weight transfer.</span><br><b>Ride height:</b> Low both ends for a low centre of gravity. Raise only if bottoming out.',
     damping:'<b>Guide:</b> Rebound 12–18, bump ~40% of rebound. <span class="why">Why: compression should be quick to absorb hits, extension slower and controlled — keeping bump well under rebound is the universal sanity check.</span>',
-    aero:'<b>Guide:</b> Aim for an Aero Balance of 0.40–0.45 — roughly balanced front/rear with a slight rear lean for RWD. <span class="why">Why: too much front aero on RWD unsettles the rear at speed.</span>',
+    aero:'<b>Guide:</b> Rear downforce scales with power-to-weight. <span class="why">Why: a high-power RWD overwhelms its two rear tyres at speed — adding rear downforce plants them through fast corners. Very-high-power cars (1+ hp/kg) want a lot of rear aero even at a top-speed cost.</span> Front eases off slightly as power rises to keep the balance rearward.',
     brakes:'<b>Guide:</b> 52–56% forward for stability. <span class="why">Why: weight shifts forward under braking, so the front can take more load without locking — forward bias keeps the rear from stepping out.</span> One % makes a difference.',
-    diffRwd:'<b>Guide:</b> Accel scaled by power-to-weight — punchy/light cars get lower accel (down to ~50%) to stop the rear snapping on exit, calmer cars can run higher (up to ~65%). <span class="why">Why: a more locked diff forces both rear wheels to drive equally, which pushes the tail wide when you get on the throttle.</span> Decel ~15% for entry stability.',
+    diffRwd:'<b>Guide:</b> Accel scaled by power-to-weight — punchy cars get lower accel (down to ~46%) to stop the rear snapping on exit, calmer cars run higher (up to ~64%). <span class="why">Why: a more locked diff forces both rear wheels to drive equally, which pushes the tail wide on throttle. The more power per kg, the less locking it can tolerate.</span> Rear toe-in also scales up with power for high-speed stability. Decel ~15%.',
     brakeSub:'% forward'
   },
   awd:{
@@ -614,10 +618,11 @@ function updateNotes(){
 
 // ── MAIN CALC ────────────────────────────────────────────────────────────
 function calc(){
-  const fw=getFW(),rw=1-fw;
-  $('fw-val').textContent=Math.round(fw*100)+'%';
-  $('rw-val').textContent=Math.round(rw*100)+'%';
-  const dt=$('drivetrain').value,wf=wFactor(),pw=pwFactor();
+  const fwRaw=getFW();
+  const fw=fwRaw===null?0.5:fwRaw, rw=1-fw;
+  $('fw-val').textContent=fwRaw===null?'—':Math.round(fw*100)+'%';
+  $('rw-val').textContent=fwRaw===null?'—':Math.round(rw*100)+'%';
+  const dt=$('drivetrain').value,wf=wFactor(),pw=pwFactor(),pwr=pwRatio();
 
   // ── TYRES (shared logic)
   const psi=tyrePSI();
@@ -655,22 +660,25 @@ function calc(){
     const rhMn=vn('rh-min'),rhMx=vn('rh-max');
     if(valid(rhMn,rhMx)){setRes('rh-f-res',rhMx,1);setRes('rh-r-res',fromMin(rhMn,rhMx,0.25),1);}
     else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
-    // Aero front max / rear ~35%
-    aeroCalc(1.0,0.35);
-    // Diff 100/0 both, centre 80
+    // Aero front max / rear scales gently up with power-to-weight (much milder than RWD)
+    aeroCalc(1.0,clamp(0.35+pw*0.15,0.35,0.50));
+    // Diff 100/0 both, centre eases slightly less rearward as PW rises (keeps drive cleaner)
     setRes('df-af-acc-res',100,0);setRes('df-af-dec-res',0,0);
     setRes('df-ar-acc-res',100,0);setRes('df-ar-dec-res',0,0);
     const cMin=vn('df-ctr-min'),cMax=vn('df-ctr-max');
-    setRes('df-ctr-res',valid(cMin,cMax)?clamp(fromMin(cMin,cMax,0.80),cMin,cMax):80,0);
+    const ctrPos=clamp(0.82-pw*0.08,0.74,0.84); // very high PW → slightly less rear bias
+    setRes('df-ctr-res',valid(cMin,cMax)?clamp(fromMin(cMin,cMax,ctrPos),cMin,cMax):Math.round(80-pw*6),0);
   } else if(dt==='rwd'){
-    // ---- Guide 3 stability-biased ----
+    // ---- Guide 3 stability-biased + power-to-weight scaling ----
+    // pw 0(tame)..1(extreme). High-PW RWD needs more rear grip everywhere.
     // Camber more aggressive, more front
     let camF=clamp(-1.5-(wf-0.5)*0.4,-1.8,-1.0);
     let camR=clamp(-1.1-(wf-0.5)*0.3,-1.5,-0.8);
     setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
-    // ARB ~20F/55R scaled
+    // ARB ~20F/55R scaled — soften rear as PW rises (less rear overload mid-corner)
     setRes('arb-f-res',fromMin(1,65,clamp(0.32+(fw-0.5)*0.3+(wf-0.5)*0.2,0.2,0.8)),1);
-    setRes('arb-r-res',fromMin(1,65,clamp(0.50+(rw-0.5)*0.3+(wf-0.5)*0.2,0.3,0.88)),1);
+    const arbRPos=clamp(0.50+(rw-0.5)*0.3+(wf-0.5)*0.2 - pw*0.12,0.28,0.88);
+    setRes('arb-r-res',fromMin(1,65,arbRPos),1);
     // Damping firmer
     const rbF=clamp(15+(fw-0.5)*2+(wf-0.5)*2,12,18);
     const rbR=clamp(15+(rw-0.5)*2+(wf-0.5)*2,12,18);
@@ -678,17 +686,24 @@ function calc(){
     setRes('bm-f-res',clamp(rbF*0.40,1,20),1);setRes('bm-r-res',clamp(rbR*0.40,1,20),1);
     // Brakes forward
     setRes('br-bal-res',Math.round(clamp(54+(fw-0.5)*8,50,58)),0);
+    // Toe: rear toe-in scales UP with power-to-weight for high-speed stability
+    const rearToe=-(0.1+pw*0.2); // -0.1 tame .. -0.3 extreme
+    setRes('toe-f-res',0.0,1);
+    setRes('toe-r-res',clamp(rearToe,-0.4,-0.1),1);
     // Ride height low both
     const rhMn=vn('rh-min'),rhMx=vn('rh-max');
     if(valid(rhMn,rhMx)){setRes('rh-f-res',fromMin(rhMn,rhMx,0.10),1);setRes('rh-r-res',fromMin(rhMn,rhMx,0.10),1);}
     else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
-    // Aero balanced, slight rear
-    aeroCalc(0.45,0.42);
-    // Diff accel scaled by power-to-weight (the F50 fix, corrected direction)
-    const rAccel=Math.round(clamp(60-pw*15,48,65));
+    // AERO: rear downforce scales hard with power-to-weight (the F50 fix)
+    // tame ~45% rear, extreme ~75% rear. Front stays high-ish but not above rear-driven balance.
+    const rearAeroPos=clamp(0.42+pw*0.35,0.42,0.80);
+    const frontAeroPos=clamp(0.55-pw*0.10,0.42,0.55); // ease front slightly as PW rises
+    aeroCalc(frontAeroPos,rearAeroPos);
+    // Diff accel scaled down by power-to-weight (corrected direction)
+    const rAccel=Math.round(clamp(62-pw*16,46,64));
     setRes('df-r-acc-res',rAccel,0);
     setRes('df-r-dec-res',15,0);
-    $('df-r-acc-sub').textContent=pw>0.6?'Lowered — high power/weight':'Weight-scaled';
+    $('df-r-acc-sub').textContent=pwr?('PW '+pwr.toFixed(2)+' hp/kg'):'Enter power & weight';
   } else if(dt==='fwd'){
     // ---- Guide 3 base, mirrored for FWD ----
     let camF=clamp(-1.2-(wf-0.5)*0.3,-1.6,-0.8);
@@ -731,7 +746,7 @@ function aeroCalc(frontPos,rearPos){
 }
 
 // ── GARAGE ─────────────────────────────────────────────────────────────────
-const FIELDS=['car-name','car-class','drivetrain','car-power','car-weight','weight-unit','tyre-compound','fw-slider',
+const FIELDS=['car-name','car-class','drivetrain','car-power','car-weight','weight-unit','tyre-compound','fw-input',
   'sp-min','sp-max','rh-min','rh-max','ae-f-min','ae-f-max','ae-r-min','ae-r-max','df-ctr-min','df-ctr-max'];
 function readState(){const s={};FIELDS.forEach(id=>{const e=$(id);if(e)s[id]=e.value});return s}
 function applyState(s){FIELDS.forEach(id=>{const e=$(id);if(e&&s[id]!==undefined)e.value=s[id]});updateDiffTabs();updateNotes();setGearFocus(gearFocus);calc()}
@@ -791,7 +806,6 @@ if('serviceWorker' in navigator){
 
 // ── INIT ────────────────────────────────────────────────────────────────────
 $('save-modal').addEventListener('click',e=>{if(e.target===$('save-modal'))closeModal()});
-$('fw-slider').addEventListener('input',calc);
 updateDiffTabs();updateNotes();setGearFocus('race');calc();
 </script>
 </body>
