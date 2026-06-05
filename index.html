@@ -217,6 +217,15 @@ input[type=range]{flex:1;accent-color:var(--accent);height:4px}
         </select>
       </div>
       <div class="fg">
+        <label>Tuning discipline</label>
+        <select id="tuning-mode" onchange="updateNotes();calc()">
+          <option value="road">Road / Circuit</option>
+          <option value="rally">Rally / Dirt</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid" style="margin-top:6px">
+      <div class="fg">
         <label>Weight unit</label>
         <select id="weight-unit" onchange="calc()">
           <option value="kg">kg</option>
@@ -545,56 +554,17 @@ function setGearFocus(f){
 }
 
 // ── DRIVETRAIN-DRIVEN NOTES ──────────────────────────────────────────────
-const NOTES={
-  rwd:{
-    banner:'<b>RWD — Stability-biased setup (Guide 3).</b> Built around predictable circuit balance. More camber, firmer dampers, forward brake bias and weight-scaled diff to keep the rear planted on power.',
-    bannerClass:'rwd',
-    tyres:'<b>Guide:</b> Lower pressure on the axle carrying most load. Lower = more grip but slower response. <span class="why">Why: the contact patch flattens out under load, so the heavier end wants slightly less pressure to keep the patch shape.</span>',
-    align:'<b>Camber:</b> Front -1.5 to -1.7°, rear slightly less. RWD wants more front camber for turn-in bite. <span class="why">Why: the steered axle leans most in corners, so it needs more negative camber to keep the tyre flat mid-turn.</span><br><b>Toe:</b> Slight rear toe-in for stability under power. <b>Caster:</b> 7°.',
-    arb:'<b>Guide:</b> RWD baseline ~20 front / 55 rear. Softer front ARB = more front grip. <span class="why">Why: a stiffer bar overloads the outside tyre on that axle, so a softer front keeps front grip and fights understeer.</span><br>Fix the end with the problem — understeer → soften front, oversteer → soften rear.',
-    springs:'<b>Guide:</b> ⅓–½ of range, heavier axle stiffer. <span class="why">Why: the heavier end needs more spring to control its weight transfer.</span><br><b>Ride height:</b> Low both ends for a low centre of gravity. Raise only if bottoming out.',
-    damping:'<b>Guide:</b> Rebound 12–18, bump ~40% of rebound. <span class="why">Why: compression should be quick to absorb hits, extension slower and controlled — keeping bump well under rebound is the universal sanity check.</span>',
-    aero:'<b>Guide:</b> Rear downforce scales with power-to-weight. <span class="why">Why: a high-power RWD overwhelms its two rear tyres at speed — adding rear downforce plants them through fast corners. Very-high-power cars (1+ hp/kg) want a lot of rear aero even at a top-speed cost.</span> Front eases off slightly as power rises to keep the balance rearward.',
-    brakes:'<b>Guide:</b> 52–56% forward for stability. <span class="why">Why: weight shifts forward under braking, so the front can take more load without locking — forward bias keeps the rear from stepping out.</span> One % makes a difference.',
-    diffRwd:'<b>Guide:</b> Accel scaled by power-to-weight — punchy cars get lower accel (down to ~46%) to stop the rear snapping on exit, calmer cars run higher (up to ~64%). <span class="why">Why: a more locked diff forces both rear wheels to drive equally, which pushes the tail wide on throttle. The more power per kg, the less locking it can tolerate.</span> Rear toe-in also scales up with power for high-speed stability. Decel ~15%.',
-    brakeSub:'% forward'
-  },
-  awd:{
-    banner:'<b>AWD — Rotation-biased setup (Guide 4).</b> Built for grippy allrounders. Light camber, softer dampers with raised rear bump, rearward brakes and locked diffs for maximum momentum.',
-    bannerClass:'awd',
-    tyres:'<b>Guide:</b> Rally tyres preferred for AWD allrounders — great grip, very PI-efficient. 21–26 PSI with rally. <span class="why">Why: lighter cars run less pressure; heavier cars need more to support the load.</span> Rear slightly softer as it carries more weight.',
-    align:'<b>Camber:</b> Light — front -0.5 to -1.0°, rear -0.3 to -0.5°. Stay between -1.0 and 0. <span class="why">Why: AWD cars put power down through all four wheels, so excessive camber just costs straight-line grip. Rear camber can be raised to cure understeer.</span><br><b>Toe:</b> Near zero. <b>Caster:</b> 7°.',
-    arb:'<b>Guide:</b> Start 1 front / 65 rear (max rear). <span class="why">Why: AWD with wide rear tyres tends to understeer, so a stiff rear bar and soft front rotates the car. Bringing the values closer together adds understeer.</span><br>If it oversteers, reduce rear or raise front.',
-    springs:'<b>Guide:</b> Align with weight distribution, soft overall. Rear-heavy car = higher rear springs. <span class="why">Why: soft springs keep the tyres planted; matching the weight split keeps the balance neutral.</span><br><b>Ride height:</b> Max front for turn-in response, low rear for rotation and top speed.',
-    damping:'<b>Guide:</b> Rebound in the middle (~8–11), bump very low (~3–5) with rear bump slightly higher. <span class="why">Why: higher rear bump gives more initial rotation while keeping the car stable under acceleration.</span> Tweak springs before damping extremes.',
-    aero:'<b>Guide:</b> Front always maximum downforce for the highest corner speed. Rear set low-mid for stability. <span class="why">Why: too little rear = oversteer, too much = understeer and drag. Grippy AWD cars can run surprisingly low rear aero.</span>',
-    brakes:'<b>Guide:</b> 48–49% (slightly rearward) for trail braking and rotation. <span class="why">Why: a touch of rear bias helps the car rotate into the corner under braking — but go too far and it spins.</span>',
-    diffAwd:'<b>Guide:</b> 100% accel front and rear for maximum momentum — reduce only if too aggressive. Decel start 0, raise rear by ~5 only if throttle pickup feels snappy. Centre ~80% rear (up to 84% if the car can handle it). <span class="why">Why: locked diffs put every bit of power down on a grippy AWD; the rear-biased centre makes it feel lively rather than nose-heavy.</span> Never below 50% rear.',
-    brakeSub:'% forward (slight rear bias)'
-  },
-  fwd:{
-    banner:'<b>FWD — Stability base (Guide 3, mirrored).</b> FWD naturally understeers, so the setup mirrors the RWD logic to free up the front: more rear camber, balanced brakes, high front diff accel.',
-    bannerClass:'fwd',
-    tyres:'<b>Guide:</b> Lower pressure on the loaded axle. <span class="why">Why: FWD carries weight and drives through the front, so front pressure matters most for both grip and traction.</span>',
-    align:'<b>Camber:</b> More negative on the REAR than front for FWD. <span class="why">Why: FWD understeers, so adding rear grip via rear camber helps the car rotate.</span><br><b>Toe:</b> Front toe-out helps turn-in if it still pushes. <b>Caster:</b> 7°.',
-    arb:'<b>Guide:</b> Stiffer front, softer rear for FWD. <span class="why">Why: a softer rear bar adds rear grip and reduces the natural understeer; some front stiffness keeps response.</span>',
-    springs:'<b>Guide:</b> ⅓–½ of range, heavier axle (usually front on FWD) stiffer. <b>Ride height:</b> Low both ends, raise only if bottoming.',
-    damping:'<b>Guide:</b> Rebound 12–18, bump ~40% of rebound. Softer front damping reduces understeer.',
-    aero:'<b>Guide:</b> Slight front bias for FWD to help the nose grip. Keep Aero Balance in the 0.40–0.45 region.',
-    brakes:'<b>Guide:</b> ~52% forward. <span class="why">Why: FWD is stable under braking already; keep it balanced so the front isn\'t overloaded.</span>',
-    diffFwd:'<b>Guide:</b> 85% accel for traction without over-locking the front. 5% decel — keep low to avoid turn-in understeer but above 0 for slight stability. <span class="why">Why: a front diff that\'s too locked fights your steering on entry.</span> Off-road diff gives slightly less understeer.',
-    brakeSub:'% forward'
-  }
-};
+const NOTES={rwd:{road:{banner:'<b>RWD Road — Stability-biased setup (Guide 3).</b> Built around predictable circuit balance. More camber, firmer dampers, forward brake bias and weight-scaled diff to keep the rear planted on power.',bannerClass:'rwd',tyres:'<b>Guide:</b> Lower pressure on the axle carrying most load. Lower = more grip but slower response. <span class="why">Why: the contact patch flattens out under load, so the heavier end wants slightly less pressure to keep the patch shape.</span>',align:'<b>Camber:</b> Front -1.5 to -1.7°, rear slightly less. RWD wants more front camber for turn-in bite. <span class="why">Why: the steered axle leans most in corners, so it needs more negative camber to keep the tyre flat mid-turn.</span><br><b>Toe:</b> Slight rear toe-in for stability under power. <b>Caster:</b> 7°.',arb:'<b>Guide:</b> RWD baseline ~20 front / 55 rear. Softer front ARB = more front grip. <span class="why">Why: a stiffer bar overloads the outside tyre on that axle, so a softer front keeps front grip and fights understeer.</span><br>Fix the end with the problem — understeer → soften front, oversteer → soften rear.',springs:'<b>Guide:</b> ⅓–½ of range, heavier axle stiffer. <span class="why">Why: the heavier end needs more spring to control its weight transfer.</span><br><b>Ride height:</b> Low both ends for a low centre of gravity. Raise only if bottoming out.',damping:'<b>Guide:</b> Rebound 12–18, bump ~40% of rebound. <span class="why">Why: compression should be quick to absorb hits, extension slower and controlled — keeping bump well under rebound is the universal sanity check.</span>',aero:'<b>Guide:</b> Rear downforce scales with power-to-weight. <span class="why">Why: a high-power RWD overwhelms its two rear tyres at speed — adding rear downforce plants them through fast corners. Very-high-power cars (1+ hp/kg) want a lot of rear aero even at a top-speed cost.</span> Front eases off slightly as power rises to keep the balance rearward.',brakes:'<b>Guide:</b> 52–56% forward for stability. <span class="why">Why: weight shifts forward under braking, so the front can take more load without locking — forward bias keeps the rear from stepping out.</span> One % makes a difference.',diffRwd:'<b>Guide:</b> Accel scaled by power-to-weight — punchy cars get lower accel (down to ~46%) to stop the rear snapping on exit, calmer cars run higher (up to ~64%). <span class="why">Why: a more locked diff forces both rear wheels to drive equally, which pushes the tail wide on throttle. The more power per kg, the less locking it can tolerate.</span> Rear toe-in also scales up with power for high-speed stability. Decel ~15%.',brakeSub:'% forward'},rally:{banner:'<b>RWD Rally — Dirt-focused, loose-surface tuning.</b> Soft suspension to absorb rough terrain, high ride height to avoid bottoming, low damping for compliance, rearward brakes for rotation.',bannerClass:'rwd',tyres:'<b>Guide:</b> Rally tyres preferred. 16–24 PSI cold, lower on lighter cars. <span class="why">Why: loose surfaces need a large contact patch. Lower pressure lets the tyre absorb ruts and jumps without bouncing.</span>',align:'<b>Camber:</b> Front -1.0 to -1.5°, rear -0.5 to -0.8° (much less aggressive). <span class="why">Why: tight dirt corners and jumping need flatter tyres to absorb terrain.</span><br><b>Toe:</b> Slight rear toe-in. <b>Caster:</b> 7°.',arb:'<b>Guide:</b> Balanced ~20–30 front / 25–35 rear. <span class="why">Why: loose surfaces don\'t punish oversteer, so you don\'t need extreme stiffness. Softer bars let wheels articulate over bumps.</span>',springs:'<b>Guide:</b> 30–50% of range, toward the soft end. <span class="why">Why: rally needs massive suspension travel to soak up jumps and ruts. Stiff springs = bottoming out and loss of traction.</span><br><b>Ride height:</b> **MAXIMUM both ends** — essential for terrain clearance.',damping:'<b>Guide:</b> Rebound 6.5–9.0, bump 2.5–4.5 (much softer than road). <span class="why">Why: soft damping lets the suspension work freely over rough ground. Too stiff = skipping over bumps and losing grip.</span>',aero:'<b>Guide:</b> Front 75–95%, rear 15–35% (low, for drag and top speed). <span class="why">Why: high-speed corners on dirt are rare. Low rear aero keeps top-end speed high on straights.</span>',brakes:'<b>Guide:</b> 40–48% (toward rear) for rotation on loose surfaces. Pressure 70–85% to prevent wheel lock. <span class="why">Why: loose dirt locks wheels instantly. Lower pressure + rearward bias lets you use brakes to rotate the car without losing grip.</span>',diffRwd:'<b>Guide:</b> Accel 55–70% (gentler scaling than road). <span class="why">Why: loose surfaces have natural slip, so even a locked diff won\'t snap as hard.</span> Decel ~20–30% for entry control. Rally diff recommended.',brakeSub:'% forward (slight rear bias)'}},awd:{road:{banner:'<b>AWD Road — Rotation-biased setup (Guide 4).</b> Built for grippy allrounders. Light camber, softer dampers with raised rear bump, rearward brakes and locked diffs for maximum momentum.',bannerClass:'awd',tyres:'<b>Guide:</b> Rally tyres preferred for AWD allrounders — great grip, very PI-efficient. 21–26 PSI with rally. <span class="why">Why: lighter cars run less pressure; heavier cars need more to support the load.</span> Rear slightly softer as it carries more weight.',align:'<b>Camber:</b> Light — front -0.5 to -1.0°, rear -0.3 to -0.5°. Stay between -1.0 and 0. <span class="why">Why: AWD cars put power down through all four wheels, so excessive camber just costs straight-line grip. Rear camber can be raised to cure understeer.</span><br><b>Toe:</b> Near zero. <b>Caster:</b> 7°.',arb:'<b>Guide:</b> Scales with weight and power like RWD. <span class="why">Why: AWD is rear-driven for traction, so it needs similar ARB philosophy — front scales with weight distribution, rear softens with power.</span>',springs:'<b>Guide:</b> Align with weight distribution, soft overall. Rear-heavy car = higher rear springs. <span class="why">Why: soft springs keep the tyres planted; matching the weight split keeps the balance neutral.</span><br><b>Ride height:</b> Max front for turn-in response, low rear for rotation and top speed.',damping:'<b>Guide:</b> Rebound in the middle (~8–11), bump very low (~3–5) with rear bump slightly higher. <span class="why">Why: higher rear bump gives more initial rotation while keeping the car stable under acceleration.</span> Tweak springs before damping extremes.',aero:'<b>Guide:</b> Front always maximum downforce for the highest corner speed. Rear set low-mid for stability. <span class="why">Why: too little rear = oversteer, too much = understeer and drag. Grippy AWD cars can run surprisingly low rear aero.</span>',brakes:'<b>Guide:</b> 48–49% (slightly rearward) for trail braking and rotation. <span class="why">Why: a touch of rear bias helps the car rotate into the corner under braking — but go too far and it spins.</span>',diffAwd:'<b>Guide:</b> 100% accel front and rear for maximum momentum. Decel start 0. Centre scales with power-to-weight — high-PW cars ease slightly less rearward. <span class="why">Why: locked diffs put every bit of power down on a grippy AWD; the rear-biased centre makes it feel lively rather than nose-heavy.</span> Never below 50% rear.',brakeSub:'% forward (slight rear bias)'},rally:{banner:'<b>AWD Rally — Dirt-focused, all-wheel traction.</b> Very soft suspension for terrain, maximum ride height, low damping, balanced aero for loose surfaces.',bannerClass:'awd',tyres:'<b>Guide:</b> Rally tyres, 16–24 PSI cold. AWD needs grip on all four wheels. <span class="why">Why: low pressure gives maximum contact patch for traction through ruts and over bumps.</span>',align:'<b>Camber:</b> Front -1.0 to -1.5°, rear -0.5 to -0.8°. <span class="why">Why: AWD doesn\'t need aggressive camber. Loose surfaces reward compliance over extreme angles.</span><br><b>Toe:</b> Near zero. <b>Caster:</b> 7°.',arb:'<b>Guide:</b> Softer than road — front ~18–25, rear ~22–28. <span class="why">Why: loose surfaces need articulation. Too stiff = wheels lose contact over terrain.</span>',springs:'<b>Guide:</b> 30–50% soft. <span class="why">Why: maximum suspension travel for jumps and ruts. Soft = grip on rough ground.</span><br><b>Ride height:</b> **MAXIMUM both ends** for terrain clearance.',damping:'<b>Guide:</b> Rebound 6.5–9.0, bump 2.5–4.5. Rear bump can be 3–5 for rotation. <span class="why">Why: soft damping lets the car work over rough terrain. Too stiff = skipping and lost grip.</span>',aero:'<b>Guide:</b> Front 70–90%, rear 10–30% (low for drag/top speed). <span class="why">Why: dirt corners are slow. Low aero = speed on straights, good high-speed stability.</span>',brakes:'<b>Guide:</b> 40–48% (rearward for rotation). Pressure 70–85%. <span class="why">Why: loose dirt locks wheels. Rearward bias + low pressure = controlled rotation without wheel lock.</span>',diffAwd:'<b>Guide:</b> Front 85–100%, rear 70–85%, front decel 0–10%, rear decel 30–40%, centre 65–75% rear. <span class="why">Why: loose surfaces give natural grip, so you can be slightly less locked up and still get traction. Rearward centre gives pivot.</span>',brakeSub:'% forward (rearward for dirt)'}},fwd:{road:{banner:'<b>FWD Road — Stability base (Guide 3, mirrored).</b> FWD naturally understeers, so the setup mirrors the RWD logic to free up the front: more rear camber, balanced brakes, high front diff accel.',bannerClass:'fwd',tyres:'<b>Guide:</b> Lower pressure on the loaded axle. <span class="why">Why: FWD carries weight and drives through the front, so front pressure matters most for both grip and traction.</span>',align:'<b>Camber:</b> More negative on the REAR than front for FWD. <span class="why">Why: FWD understeers, so adding rear grip via rear camber helps the car rotate.</span><br><b>Toe:</b> Front toe-out helps turn-in if it still pushes. <b>Caster:</b> 7°.',arb:'<b>Guide:</b> Stiffer front, softer rear for FWD. <span class="why">Why: a softer rear bar adds rear grip and reduces the natural understeer; some front stiffness keeps response.</span>',springs:'<b>Guide:</b> ⅓–½ of range, heavier axle (usually front on FWD) stiffer. <b>Ride height:</b> Low both ends, raise only if bottoming.',damping:'<b>Guide:</b> Rebound 12–18, bump ~40% of rebound. Softer front damping reduces understeer.',aero:'<b>Guide:</b> Slight front bias for FWD to help the nose grip. Keep Aero Balance in the 0.40–0.45 region.',brakes:'<b>Guide:</b> ~52% forward. <span class="why">Why: FWD is stable under braking already; keep it balanced so the front isn\'t overloaded.</span>',diffFwd:'<b>Guide:</b> 85% accel for traction without over-locking the front. 5% decel — keep low to avoid turn-in understeer but above 0 for slight stability. <span class="why">Why: a front diff that\'s too locked fights your steering on entry.</span> Off-road diff gives slightly less understeer.',brakeSub:'% forward'},rally:{banner:'<b>FWD Rally — Front-drive on loose surfaces.</b> Soft suspension, high ride height, low damping, front-biased for traction through loose terrain.',bannerClass:'fwd',tyres:'<b>Guide:</b> Rally tyres, 16–24 PSI. FWD needs front traction. <span class="why">Why: low pressure maximises front contact patch for power delivery on loose dirt.</span>',align:'<b>Camber:</b> Front -1.0 to -1.5°, rear -0.5 to -0.8°. <span class="why">Why: FWD steers and drives through the front, so moderate front camber helps grip without killing traction.</span><br><b>Toe:</b> Slight front toe-out for turn-in. <b>Caster:</b> 7°.',arb:'<b>Guide:</b> Softer overall — front ~18–25, rear ~15–22. <span class="why">Why: loose surfaces need articulation. FWD especially needs soft front for steering response.</span>',springs:'<b>Guide:</b> 30–50% soft. <span class="why">Why: suspension travel is everything on rough terrain.</span><br><b>Ride height:</b> **MAXIMUM both ends**.',damping:'<b>Guide:</b> Rebound 6.5–9.0, bump 2.5–4.5 (softer front). <span class="why">Why: FWD needs soft front damping to maintain steering feel over bumps.</span>',aero:'<b>Guide:</b> Front 75–95%, rear 15–35% (low). <span class="why">Why: FWD needs front downforce for grip. Low rear = top speed on straights.</span>',brakes:'<b>Guide:</b> 40–48% (rearward). Pressure 70–85%. <span class="why">Why: rearward bias helps FWD rotate. Low pressure prevents lock-up on dirt.</span>',diffFwd:'<b>Guide:</b> Accel 80–100%, decel 0–10%. <span class="why">Why: loose dirt is forgiving. You can lock the front without snap.</span>',brakeSub:'% forward (rearward for dirt)'}}};
 
 function updateNotes(){
-  const dt=$('drivetrain').value;
+  const dt=$('drivetrain').value,md=$('tuning-mode').value;
   const banner=$('mode-banner');
-  if(!dt||!NOTES[dt]){banner.className='mode-banner';$('hdr-mode').textContent='Select drivetrain';return;}
-  const n=NOTES[dt];
+  if(!dt||!NOTES[dt]||!NOTES[dt][md]){banner.className='mode-banner';$('hdr-mode').textContent='Select drivetrain';return;}
+  const n=NOTES[dt][md];
   banner.className='mode-banner show '+n.bannerClass;
   banner.innerHTML=n.banner;
-  $('hdr-mode').textContent={rwd:'RWD · Stability tune',awd:'AWD · Rotation tune',fwd:'FWD · Stability tune'}[dt];
+  const mode_txt=md==='rally'?' · Rally':'';
+  $('hdr-mode').textContent={rwd:'RWD · Stability tune',awd:'AWD · Rotation tune',fwd:'FWD · Stability tune'}[dt]+mode_txt;
   $('note-tyres').innerHTML=n.tyres;
   $('note-align').innerHTML=n.align;
   $('note-arb').innerHTML=n.arb;
@@ -606,8 +576,11 @@ function updateNotes(){
   if(dt==='rwd')$('note-diff-rwd').innerHTML=n.diffRwd;
   if(dt==='awd')$('note-diff-awd').innerHTML=n.diffAwd;
   if(dt==='fwd')$('note-diff-fwd').innerHTML=n.diffFwd;
-  // ride height / aero headers reflect philosophy
-  if(dt==='awd'){
+  // ride height / aero headers
+  if(md==='rally'){
+    $('rh-f-hdr').textContent='Front (max)';$('rh-r-hdr').textContent='Rear (max)';
+    $('ae-f-hdr').textContent='Front (75–95%)';$('ae-r-hdr').textContent='Rear (15–35%)';
+  } else if(dt==='awd'){
     $('rh-f-hdr').textContent='Front (max)';$('rh-r-hdr').textContent='Rear (low)';
     $('ae-f-hdr').textContent='Front (max)';$('ae-r-hdr').textContent='Rear (~35%)';
   } else {
@@ -622,12 +595,18 @@ function calc(){
   const fw=fwRaw===null?0.5:fwRaw, rw=1-fw;
   $('fw-val').textContent=fwRaw===null?'—':Math.round(fw*100)+'%';
   $('rw-val').textContent=fwRaw===null?'—':Math.round(rw*100)+'%';
-  const dt=$('drivetrain').value,wf=wFactor(),pw=pwFactor(),pwr=pwRatio();
+  const dt=$('drivetrain').value,md=$('tuning-mode').value,wf=wFactor(),pw=pwFactor(),pwr=pwRatio();
 
-  // ── TYRES (shared logic)
-  const psi=tyrePSI();
-  setRes('tp-f-res',clamp(psi+(fw-0.5)*(-1.5),15,55),1);
-  setRes('tp-r-res',clamp(psi+(rw-0.5)*(-1.5),15,55),1);
+  // ── TYRES (mode-specific)
+  if(md==='rally'){
+    const rallyPsi=20+(wf-0.5)*(-8); // 16-24 PSI range, lighter cars lower
+    setRes('tp-f-res',clamp(rallyPsi+(fw-0.5)*(-1),15,30),1);
+    setRes('tp-r-res',clamp(rallyPsi+(rw-0.5)*(-1),15,30),1);
+  } else {
+    const psi=tyrePSI();
+    setRes('tp-f-res',clamp(psi+(fw-0.5)*(-1.5),15,55),1);
+    setRes('tp-r-res',clamp(psi+(rw-0.5)*(-1.5),15,55),1);
+  }
 
   // ── GEARING (shared, fixed 2.2-6.1)
   const focusPos={race:0.65,sprint:0.45,drag:0.80}[gearFocus]||0.65;
@@ -639,103 +618,150 @@ function calc(){
   setRes('toe-f-res',dt==='fwd'?0.0:0.0,1);
   setRes('toe-r-res',dt==='rwd'?-0.1:0.0,1);
 
-  // ── DRIVETRAIN-SPECIFIC PHILOSOPHY
-  if(dt==='awd'){
-    // ---- Guide 4 rotation-biased ----
-    // Camber light
-    let camF=clamp(-0.7-(wf-0.5)*0.3,-1.0,0.0);
-    let camR=clamp(-0.4-(wf-0.5)*0.2,-0.8,0.0);
-    setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
-    // ARB 1F/65R start
-    setRes('arb-f-res',clamp(1+(fw-0.5)*20+(wf-0.5)*10,1,40),1);
-    setRes('arb-r-res',65,1);
-    // Damping soft, rear bump higher
-    const rbF=clamp(8.5+(fw-0.5)*2+(wf-0.5)*2,7,13);
-    const rbR=clamp(9.5+(rw-0.5)*2+(wf-0.5)*2,8,14);
-    setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
-    setRes('bm-f-res',clamp(rbF*0.38,1,20),1);setRes('bm-r-res',clamp(rbR*0.45,1,20),1);
-    // Brakes rearward
-    setRes('br-bal-res',Math.round(clamp(48+(fw-0.5)*4,46,52)),0);
-    // Ride height max front / low rear
-    const rhMn=vn('rh-min'),rhMx=vn('rh-max');
-    if(valid(rhMn,rhMx)){setRes('rh-f-res',rhMx,1);setRes('rh-r-res',fromMin(rhMn,rhMx,0.25),1);}
-    else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
-    // Aero front max / rear scales gently up with power-to-weight (much milder than RWD)
-    aeroCalc(1.0,clamp(0.35+pw*0.15,0.35,0.50));
-    // Diff 100/0 both, centre eases slightly less rearward as PW rises (keeps drive cleaner)
-    setRes('df-af-acc-res',100,0);setRes('df-af-dec-res',0,0);
-    setRes('df-ar-acc-res',100,0);setRes('df-ar-dec-res',0,0);
-    const cMin=vn('df-ctr-min'),cMax=vn('df-ctr-max');
-    const ctrPos=clamp(0.82-pw*0.08,0.74,0.84); // very high PW → slightly less rear bias
-    setRes('df-ctr-res',valid(cMin,cMax)?clamp(fromMin(cMin,cMax,ctrPos),cMin,cMax):Math.round(80-pw*6),0);
-  } else if(dt==='rwd'){
-    // ---- Guide 3 stability-biased + power-to-weight scaling ----
-    // pw 0(tame)..1(extreme). High-PW RWD needs more rear grip everywhere.
-    // Camber more aggressive, more front
-    let camF=clamp(-1.5-(wf-0.5)*0.4,-1.8,-1.0);
-    let camR=clamp(-1.1-(wf-0.5)*0.3,-1.5,-0.8);
-    setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
-    // ARB ~20F/55R scaled — soften rear as PW rises (less rear overload mid-corner)
-    setRes('arb-f-res',fromMin(1,65,clamp(0.32+(fw-0.5)*0.3+(wf-0.5)*0.2,0.2,0.8)),1);
-    const arbRPos=clamp(0.50+(rw-0.5)*0.3+(wf-0.5)*0.2 - pw*0.12,0.28,0.88);
-    setRes('arb-r-res',fromMin(1,65,arbRPos),1);
-    // Damping firmer
-    const rbF=clamp(15+(fw-0.5)*2+(wf-0.5)*2,12,18);
-    const rbR=clamp(15+(rw-0.5)*2+(wf-0.5)*2,12,18);
-    setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
-    setRes('bm-f-res',clamp(rbF*0.40,1,20),1);setRes('bm-r-res',clamp(rbR*0.40,1,20),1);
-    // Brakes forward
-    setRes('br-bal-res',Math.round(clamp(54+(fw-0.5)*8,50,58)),0);
-    // Toe: rear toe-in scales UP with power-to-weight for high-speed stability
-    const rearToe=-(0.1+pw*0.2); // -0.1 tame .. -0.3 extreme
-    setRes('toe-f-res',0.0,1);
-    setRes('toe-r-res',clamp(rearToe,-0.4,-0.1),1);
-    // Ride height low both
-    const rhMn=vn('rh-min'),rhMx=vn('rh-max');
-    if(valid(rhMn,rhMx)){setRes('rh-f-res',fromMin(rhMn,rhMx,0.10),1);setRes('rh-r-res',fromMin(rhMn,rhMx,0.10),1);}
-    else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
-    // AERO: rear downforce scales hard with power-to-weight (the F50 fix)
-    // tame ~45% rear, extreme ~75% rear. Front stays high-ish but not above rear-driven balance.
-    const rearAeroPos=clamp(0.42+pw*0.35,0.42,0.80);
-    const frontAeroPos=clamp(0.55-pw*0.10,0.42,0.55); // ease front slightly as PW rises
-    aeroCalc(frontAeroPos,rearAeroPos);
-    // Diff accel scaled down by power-to-weight (corrected direction)
-    const rAccel=Math.round(clamp(62-pw*16,46,64));
-    setRes('df-r-acc-res',rAccel,0);
-    setRes('df-r-dec-res',15,0);
-    $('df-r-acc-sub').textContent=pwr?('PW '+pwr.toFixed(2)+' hp/kg'):'Enter power & weight';
-  } else if(dt==='fwd'){
-    // ---- Guide 3 base, mirrored for FWD ----
-    let camF=clamp(-1.2-(wf-0.5)*0.3,-1.6,-0.8);
-    let camR=clamp(-1.5-(wf-0.5)*0.3,-1.8,-1.0); // more rear camber
-    setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
-    // ARB stiffer front, softer rear
-    setRes('arb-f-res',fromMin(1,65,clamp(0.55+(fw-0.5)*0.2+(wf-0.5)*0.15,0.35,0.9)),1);
-    setRes('arb-r-res',fromMin(1,65,clamp(0.35+(rw-0.5)*0.2+(wf-0.5)*0.1,0.2,0.7)),1);
-    const rbF=clamp(15+(fw-0.5)*2+(wf-0.5)*2,12,18);
-    const rbR=clamp(15+(rw-0.5)*2+(wf-0.5)*2,12,18);
-    setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
-    setRes('bm-f-res',clamp(rbF*0.40,1,20),1);setRes('bm-r-res',clamp(rbR*0.40,1,20),1);
-    setRes('br-bal-res',Math.round(clamp(52+(fw-0.5)*6,50,56)),0);
-    const rhMn=vn('rh-min'),rhMx=vn('rh-max');
-    if(valid(rhMn,rhMx)){setRes('rh-f-res',fromMin(rhMn,rhMx,0.10),1);setRes('rh-r-res',fromMin(rhMn,rhMx,0.10),1);}
-    else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
-    aeroCalc(0.55,0.40); // slight front bias
-    setRes('df-f-acc-res',85,0);setRes('df-f-dec-res',5,0);
-  } else {
-    // no drivetrain — clear dependent results
-    ['ca-f-res','ca-r-res','arb-f-res','arb-r-res','rb-f-res','rb-r-res','bm-f-res','bm-r-res','br-bal-res','rh-f-res','rh-r-res','ae-f-res','ae-r-res'].forEach(id=>setRes(id,null,1));
+  // ── MODE-SPECIFIC DRIVETRAIN LOGIC
+  if(md==='road'){
+    // ════ ROAD/CIRCUIT TUNING ════
+    if(dt==='awd'){
+      let camF=clamp(-0.7-(wf-0.5)*0.3,-1.0,0.0);
+      let camR=clamp(-0.4-(wf-0.5)*0.2,-0.8,0.0);
+      setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
+      setRes('arb-f-res',fromMin(1,65,clamp(0.32+(fw-0.5)*0.3+(wf-0.5)*0.2,0.2,0.8)),1);
+      const arbRPos=clamp(0.50+(rw-0.5)*0.3+(wf-0.5)*0.2 - pw*0.12,0.28,0.88);
+      setRes('arb-r-res',fromMin(1,65,arbRPos),1);
+      const rbF=clamp(8.5+(fw-0.5)*2+(wf-0.5)*2,7,13);
+      const rbR=clamp(9.5+(rw-0.5)*2+(wf-0.5)*2,8,14);
+      setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
+      setRes('bm-f-res',clamp(rbF*0.38,1,20),1);setRes('bm-r-res',clamp(rbR*0.45,1,20),1);
+      setRes('br-bal-res',Math.round(clamp(48+(fw-0.5)*4,46,52)),0);
+      const rhMn=vn('rh-min'),rhMx=vn('rh-max');
+      if(valid(rhMn,rhMx)){setRes('rh-f-res',rhMx,1);setRes('rh-r-res',fromMin(rhMn,rhMx,0.25),1);}
+      else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
+      aeroCalc(1.0,clamp(0.35+pw*0.15,0.35,0.50));
+      setRes('df-af-acc-res',100,0);setRes('df-af-dec-res',0,0);
+      setRes('df-ar-acc-res',100,0);setRes('df-ar-dec-res',0,0);
+      const cMin=vn('df-ctr-min'),cMax=vn('df-ctr-max');
+      const ctrPos=clamp(0.82-pw*0.08,0.74,0.84);
+      setRes('df-ctr-res',valid(cMin,cMax)?clamp(fromMin(cMin,cMax,ctrPos),cMin,cMax):Math.round(80-pw*6),0);
+    } else if(dt==='rwd'){
+      let camF=clamp(-1.5-(wf-0.5)*0.4,-1.8,-1.0);
+      let camR=clamp(-1.1-(wf-0.5)*0.3,-1.5,-0.8);
+      setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
+      setRes('arb-f-res',fromMin(1,65,clamp(0.32+(fw-0.5)*0.3+(wf-0.5)*0.2,0.2,0.8)),1);
+      const arbRPos=clamp(0.50+(rw-0.5)*0.3+(wf-0.5)*0.2 - pw*0.12,0.28,0.88);
+      setRes('arb-r-res',fromMin(1,65,arbRPos),1);
+      const rbF=clamp(15+(fw-0.5)*2+(wf-0.5)*2,12,18);
+      const rbR=clamp(15+(rw-0.5)*2+(wf-0.5)*2,12,18);
+      setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
+      setRes('bm-f-res',clamp(rbF*0.40,1,20),1);setRes('bm-r-res',clamp(rbR*0.40,1,20),1);
+      setRes('br-bal-res',Math.round(clamp(54+(fw-0.5)*8,50,58)),0);
+      const rearToe=-(0.1+pw*0.2);
+      setRes('toe-f-res',0.0,1);
+      setRes('toe-r-res',clamp(rearToe,-0.4,-0.1),1);
+      const rhMn=vn('rh-min'),rhMx=vn('rh-max');
+      if(valid(rhMn,rhMx)){setRes('rh-f-res',fromMin(rhMn,rhMx,0.10),1);setRes('rh-r-res',fromMin(rhMn,rhMx,0.10),1);}
+      else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
+      const rearAeroPos=clamp(0.42+pw*0.35,0.42,0.80);
+      const frontAeroPos=clamp(0.55-pw*0.10,0.42,0.55);
+      aeroCalc(frontAeroPos,rearAeroPos);
+      const rAccel=Math.round(clamp(62-pw*16,46,64));
+      setRes('df-r-acc-res',rAccel,0);
+      setRes('df-r-dec-res',15,0);
+      $('df-r-acc-sub').textContent=pwr?('PW '+pwr.toFixed(2)+' hp/kg'):'Enter power & weight';
+    } else if(dt==='fwd'){
+      let camF=clamp(-1.2-(wf-0.5)*0.3,-1.6,-0.8);
+      let camR=clamp(-1.5-(wf-0.5)*0.3,-1.8,-1.0);
+      setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
+      setRes('arb-f-res',fromMin(1,65,clamp(0.55+(fw-0.5)*0.2+(wf-0.5)*0.15,0.35,0.9)),1);
+      setRes('arb-r-res',fromMin(1,65,clamp(0.35+(rw-0.5)*0.2+(wf-0.5)*0.1,0.2,0.7)),1);
+      const rbF=clamp(15+(fw-0.5)*2+(wf-0.5)*2,12,18);
+      const rbR=clamp(15+(rw-0.5)*2+(wf-0.5)*2,12,18);
+      setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
+      setRes('bm-f-res',clamp(rbF*0.40,1,20),1);setRes('bm-r-res',clamp(rbR*0.40,1,20),1);
+      setRes('br-bal-res',Math.round(clamp(52+(fw-0.5)*6,50,56)),0);
+      const rhMn=vn('rh-min'),rhMx=vn('rh-max');
+      if(valid(rhMn,rhMx)){setRes('rh-f-res',fromMin(rhMn,rhMx,0.10),1);setRes('rh-r-res',fromMin(rhMn,rhMx,0.10),1);}
+      else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
+      aeroCalc(0.55,0.40);
+      setRes('df-f-acc-res',85,0);setRes('df-f-dec-res',5,0);
+    } else {
+      ['ca-f-res','ca-r-res','arb-f-res','arb-r-res','rb-f-res','rb-r-res','bm-f-res','bm-r-res','br-bal-res','rh-f-res','rh-r-res','ae-f-res','ae-r-res'].forEach(id=>setRes(id,null,1));
+    }
+    // ── ROAD SPRINGS (shared principle: scale with weight)
+    const spMn=vn('sp-min'),spMx=vn('sp-max');
+    const spFPos=clamp(0.34+(fw-0.5)*0.30+(wf-0.5)*0.15,0.2,0.62);
+    const spRPos=clamp(0.34+(rw-0.5)*0.30+(wf-0.5)*0.15,0.2,0.62);
+    setRes('sp-f-res',valid(spMn,spMx)?fromMin(spMn,spMx,spFPos):null,1);
+    setRes('sp-r-res',valid(spMn,spMx)?fromMin(spMn,spMx,spRPos):null,1);
+    // ── ROAD BRAKE PRESSURE
+    setRes('br-pres-res',100,0);
+  } else if(md==='rally'){
+    // ════ RALLY/DIRT TUNING ════
+    if(dt==='awd'){
+      let camF=clamp(-1.25-(wf-0.5)*0.2,-1.5,-1.0);
+      let camR=clamp(-0.65-(wf-0.5)*0.1,-0.8,-0.5);
+      setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
+      setRes('arb-f-res',fromMin(1,65,clamp(0.28+(fw-0.5)*0.25+(wf-0.5)*0.15,0.18,0.6)),1);
+      setRes('arb-r-res',fromMin(1,65,clamp(0.40+(rw-0.5)*0.25+(wf-0.5)*0.15,0.25,0.65)),1);
+      const rbF=clamp(7.5+(fw-0.5)*1.5+(wf-0.5)*1,6.5,9);
+      const rbR=clamp(8.5+(rw-0.5)*1.5+(wf-0.5)*1,7,10);
+      setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
+      setRes('bm-f-res',clamp(rbF*0.45,1,20),1);setRes('bm-r-res',clamp(rbR*0.45,1,20),1);
+      setRes('br-bal-res',Math.round(clamp(44+(fw-0.5)*3,40,48)),0);
+      const rhMn=vn('rh-min'),rhMx=vn('rh-max');
+      if(valid(rhMn,rhMx)){setRes('rh-f-res',rhMx,1);setRes('rh-r-res',rhMx,1);}
+      else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
+      aeroCalc(0.80,0.20);
+      setRes('df-af-acc-res',92,0);setRes('df-af-dec-res',5,0);
+      setRes('df-ar-acc-res',77,0);setRes('df-ar-dec-res',35,0);
+      const cMin=vn('df-ctr-min'),cMax=vn('df-ctr-max');
+      setRes('df-ctr-res',valid(cMin,cMax)?clamp(fromMin(cMin,cMax,0.70),cMin,cMax):70,0);
+    } else if(dt==='rwd'){
+      let camF=clamp(-1.25-(wf-0.5)*0.2,-1.5,-1.0);
+      let camR=clamp(-0.65-(wf-0.5)*0.1,-0.8,-0.5);
+      setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
+      setRes('arb-f-res',fromMin(1,65,clamp(0.28+(fw-0.5)*0.25+(wf-0.5)*0.15,0.18,0.6)),1);
+      setRes('arb-r-res',fromMin(1,65,clamp(0.40+(rw-0.5)*0.25+(wf-0.5)*0.15,0.25,0.65)),1);
+      const rbF=clamp(7.5+(fw-0.5)*1.5+(wf-0.5)*1,6.5,9);
+      const rbR=clamp(8.5+(rw-0.5)*1.5+(wf-0.5)*1,7,10);
+      setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
+      setRes('bm-f-res',clamp(rbF*0.45,1,20),1);setRes('bm-r-res',clamp(rbR*0.45,1,20),1);
+      setRes('br-bal-res',Math.round(clamp(44+(fw-0.5)*3,40,48)),0);
+      const rhMn=vn('rh-min'),rhMx=vn('rh-max');
+      if(valid(rhMn,rhMx)){setRes('rh-f-res',rhMx,1);setRes('rh-r-res',rhMx,1);}
+      else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
+      aeroCalc(0.85,0.25);
+      const rAccel=Math.round(clamp(62-pw*8,55,70)); // gentler scaling than road
+      setRes('df-r-acc-res',rAccel,0);
+      setRes('df-r-dec-res',25,0);
+      $('df-r-acc-sub').textContent='Rally';
+    } else if(dt==='fwd'){
+      let camF=clamp(-1.25-(wf-0.5)*0.2,-1.5,-1.0);
+      let camR=clamp(-0.65-(wf-0.5)*0.1,-0.8,-0.5);
+      setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
+      setRes('arb-f-res',fromMin(1,65,clamp(0.50+(fw-0.5)*0.15+(wf-0.5)*0.1,0.35,0.75)),1);
+      setRes('arb-r-res',fromMin(1,65,clamp(0.30+(rw-0.5)*0.15+(wf-0.5)*0.1,0.18,0.55)),1);
+      const rbF=clamp(7.5+(fw-0.5)*1.5+(wf-0.5)*1,6.5,9);
+      const rbR=clamp(8.5+(rw-0.5)*1.5+(wf-0.5)*1,7,10);
+      setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
+      setRes('bm-f-res',clamp(rbF*0.45,1,20),1);setRes('bm-r-res',clamp(rbR*0.45,1,20),1);
+      setRes('br-bal-res',Math.round(clamp(44+(fw-0.5)*3,40,48)),0);
+      const rhMn=vn('rh-min'),rhMx=vn('rh-max');
+      if(valid(rhMn,rhMx)){setRes('rh-f-res',rhMx,1);setRes('rh-r-res',rhMx,1);}
+      else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
+      aeroCalc(0.85,0.25);
+      setRes('df-f-acc-res',90,0);setRes('df-f-dec-res',5,0);
+    } else {
+      ['ca-f-res','ca-r-res','arb-f-res','arb-r-res','rb-f-res','rb-r-res','bm-f-res','bm-r-res','br-bal-res','rh-f-res','rh-r-res','ae-f-res','ae-r-res'].forEach(id=>setRes(id,null,1));
+    }
+    // ── RALLY SPRINGS (softer than road, 40% baseline)
+    const spMn=vn('sp-min'),spMx=vn('sp-max');
+    const spFPos=clamp(0.40+(fw-0.5)*0.25+(wf-0.5)*0.10,0.28,0.55);
+    const spRPos=clamp(0.40+(rw-0.5)*0.25+(wf-0.5)*0.10,0.28,0.55);
+    setRes('sp-f-res',valid(spMn,spMx)?fromMin(spMn,spMx,spFPos):null,1);
+    setRes('sp-r-res',valid(spMn,spMx)?fromMin(spMn,spMx,spRPos):null,1);
+    // ── RALLY BRAKE PRESSURE (lower to prevent lockup on loose dirt)
+    setRes('br-pres-res',75,0);
   }
-
-  // ── SPRINGS (shared principle: scale with weight)
-  const spMn=vn('sp-min'),spMx=vn('sp-max');
-  const spFPos=clamp(0.34+(fw-0.5)*0.30+(wf-0.5)*0.15,0.2,0.62);
-  const spRPos=clamp(0.34+(rw-0.5)*0.30+(wf-0.5)*0.15,0.2,0.62);
-  setRes('sp-f-res',valid(spMn,spMx)?fromMin(spMn,spMx,spFPos):null,1);
-  setRes('sp-r-res',valid(spMn,spMx)?fromMin(spMn,spMx,spRPos):null,1);
-
-  // ── BRAKE PRESSURE (shared)
-  setRes('br-pres-res',100,0);
 }
 
 function aeroCalc(frontPos,rearPos){
@@ -746,7 +772,7 @@ function aeroCalc(frontPos,rearPos){
 }
 
 // ── GARAGE ─────────────────────────────────────────────────────────────────
-const FIELDS=['car-name','car-class','drivetrain','car-power','car-weight','weight-unit','tyre-compound','fw-input',
+const FIELDS=['car-name','car-class','drivetrain','tuning-mode','car-power','car-weight','weight-unit','tyre-compound','fw-input',
   'sp-min','sp-max','rh-min','rh-max','ae-f-min','ae-f-max','ae-r-min','ae-r-max','df-ctr-min','df-ctr-max'];
 function readState(){const s={};FIELDS.forEach(id=>{const e=$(id);if(e)s[id]=e.value});return s}
 function applyState(s){FIELDS.forEach(id=>{const e=$(id);if(e&&s[id]!==undefined)e.value=s[id]});updateDiffTabs();updateNotes();setGearFocus(gearFocus);calc()}
