@@ -619,17 +619,27 @@ function calc(){
   setRes('toe-r-res',dt==='rwd'?-0.1:0.0,1);
 
   // ── MODE-SPECIFIC DRIVETRAIN LOGIC
+  let spFPos=0.34, spRPos=0.34, rbF=15, rbR=15; // declare at mode level for springs/damping section
   if(md==='road'){
     // ════ ROAD/CIRCUIT TUNING ════
     if(dt==='awd'){
       let camF=clamp(-0.7-(wf-0.5)*0.3,-1.0,0.0);
       let camR=clamp(-0.4-(wf-0.5)*0.2,-0.8,0.0);
       setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
-      setRes('arb-f-res',fromMin(1,65,clamp(0.32+(fw-0.5)*0.3+(wf-0.5)*0.2,0.2,0.8)),1);
+      const arbFPos=clamp(0.32+(fw-0.5)*0.3+(wf-0.5)*0.2,0.2,0.8);
       const arbRPos=clamp(0.50+(rw-0.5)*0.3+(wf-0.5)*0.2 - pw*0.12,0.28,0.88);
+      setRes('arb-f-res',fromMin(1,65,arbFPos),1);
       setRes('arb-r-res',fromMin(1,65,arbRPos),1);
-      const rbF=clamp(8.5+(fw-0.5)*2+(wf-0.5)*2,7,13);
-      const rbR=clamp(9.5+(rw-0.5)*2+(wf-0.5)*2,8,14);
+      const spWeightF=0.34+(fw-0.5)*0.30+(wf-0.5)*0.15;
+      const spWeightR=0.34+(rw-0.5)*0.30+(wf-0.5)*0.15;
+      const spArbInvF=0.5-(arbFPos-0.5);
+      const spArbInvR=0.5-(arbRPos-0.5);
+      spFPos=clamp(spWeightF*0.6+spArbInvF*0.4,0.2,0.7);
+      spRPos=clamp(spWeightR*0.6+spArbInvR*0.4,0.2,0.7);
+      const rbFInv=8.5-(spFPos-0.34)*15;
+      const rbRInv=9.5-(spRPos-0.34)*15;
+      rbF=clamp(rbFInv+(fw-0.5)*2+(wf-0.5)*2,7,13);
+      rbR=clamp(rbRInv+(rw-0.5)*2+(wf-0.5)*2,8,14);
       setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
       setRes('bm-f-res',clamp(rbF*0.38,1,20),1);setRes('bm-r-res',clamp(rbR*0.45,1,20),1);
       setRes('br-bal-res',Math.round(clamp(48+(fw-0.5)*4,46,52)),0);
@@ -646,11 +656,23 @@ function calc(){
       let camF=clamp(-1.5-(wf-0.5)*0.4,-1.8,-1.0);
       let camR=clamp(-1.1-(wf-0.5)*0.3,-1.5,-0.8);
       setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
-      setRes('arb-f-res',fromMin(1,65,clamp(0.32+(fw-0.5)*0.3+(wf-0.5)*0.2,0.2,0.8)),1);
+      // ARBs
+      const arbFPos=clamp(0.32+(fw-0.5)*0.3+(wf-0.5)*0.2,0.2,0.8);
       const arbRPos=clamp(0.50+(rw-0.5)*0.3+(wf-0.5)*0.2 - pw*0.12,0.28,0.88);
+      setRes('arb-f-res',fromMin(1,65,arbFPos),1);
       setRes('arb-r-res',fromMin(1,65,arbRPos),1);
-      const rbF=clamp(15+(fw-0.5)*2+(wf-0.5)*2,12,18);
-      const rbR=clamp(15+(rw-0.5)*2+(wf-0.5)*2,12,18);
+      // Springs: weight-based + complement ARBs (soft ARB → stiff spring)
+      const spWeightF=0.34+(fw-0.5)*0.30+(wf-0.5)*0.15;
+      const spWeightR=0.34+(rw-0.5)*0.30+(wf-0.5)*0.15;
+      const spArbInvF=0.5-(arbFPos-0.5); // invert ARB: soft→stiff
+      const spArbInvR=0.5-(arbRPos-0.5);
+      spFPos=clamp(spWeightF*0.6+spArbInvF*0.4,0.2,0.7);
+      spRPos=clamp(spWeightR*0.6+spArbInvR*0.4,0.2,0.7);
+      // Damping: rebound inverse of springs (soft springs → stiff rebound)
+      const rbFInv=15-(spFPos-0.34)*30;
+      const rbRInv=15-(spRPos-0.34)*30;
+      rbF=clamp(rbFInv+(fw-0.5)*2+(wf-0.5)*2,10,18);
+      rbR=clamp(rbRInv+(rw-0.5)*2+(wf-0.5)*2,10,18);
       setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
       setRes('bm-f-res',clamp(rbF*0.40,1,20),1);setRes('bm-r-res',clamp(rbR*0.40,1,20),1);
       setRes('br-bal-res',Math.round(clamp(54+(fw-0.5)*8,50,58)),0);
@@ -671,10 +693,20 @@ function calc(){
       let camF=clamp(-1.2-(wf-0.5)*0.3,-1.6,-0.8);
       let camR=clamp(-1.5-(wf-0.5)*0.3,-1.8,-1.0);
       setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
-      setRes('arb-f-res',fromMin(1,65,clamp(0.55+(fw-0.5)*0.2+(wf-0.5)*0.15,0.35,0.9)),1);
-      setRes('arb-r-res',fromMin(1,65,clamp(0.35+(rw-0.5)*0.2+(wf-0.5)*0.1,0.2,0.7)),1);
-      const rbF=clamp(15+(fw-0.5)*2+(wf-0.5)*2,12,18);
-      const rbR=clamp(15+(rw-0.5)*2+(wf-0.5)*2,12,18);
+      const arbFPos=clamp(0.55+(fw-0.5)*0.2+(wf-0.5)*0.15,0.35,0.9);
+      const arbRPos=clamp(0.35+(rw-0.5)*0.2+(wf-0.5)*0.1,0.2,0.7);
+      setRes('arb-f-res',fromMin(1,65,arbFPos),1);
+      setRes('arb-r-res',fromMin(1,65,arbRPos),1);
+      const spWeightF=0.34+(fw-0.5)*0.30+(wf-0.5)*0.15;
+      const spWeightR=0.34+(rw-0.5)*0.30+(wf-0.5)*0.15;
+      const spArbInvF=0.5-(arbFPos-0.5);
+      const spArbInvR=0.5-(arbRPos-0.5);
+      spFPos=clamp(spWeightF*0.6+spArbInvF*0.4,0.2,0.7);
+      spRPos=clamp(spWeightR*0.6+spArbInvR*0.4,0.2,0.7);
+      const rbFInv=15-(spFPos-0.34)*30;
+      const rbRInv=15-(spRPos-0.34)*30;
+      rbF=clamp(rbFInv+(fw-0.5)*2+(wf-0.5)*2,10,18);
+      rbR=clamp(rbRInv+(rw-0.5)*2+(wf-0.5)*2,10,18);
       setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
       setRes('bm-f-res',clamp(rbF*0.40,1,20),1);setRes('bm-r-res',clamp(rbR*0.40,1,20),1);
       setRes('br-bal-res',Math.round(clamp(52+(fw-0.5)*6,50,56)),0);
@@ -686,12 +718,10 @@ function calc(){
     } else {
       ['ca-f-res','ca-r-res','arb-f-res','arb-r-res','rb-f-res','rb-r-res','bm-f-res','bm-r-res','br-bal-res','rh-f-res','rh-r-res','ae-f-res','ae-r-res'].forEach(id=>setRes(id,null,1));
     }
-    // ── ROAD SPRINGS (shared principle: scale with weight)
+    // ── ROAD SPRINGS (use drivetrain-calculated positions)
     const spMn=vn('sp-min'),spMx=vn('sp-max');
-    const spFPos=clamp(0.34+(fw-0.5)*0.30+(wf-0.5)*0.15,0.2,0.62);
-    const spRPos=clamp(0.34+(rw-0.5)*0.30+(wf-0.5)*0.15,0.2,0.62);
-    setRes('sp-f-res',valid(spMn,spMx)?fromMin(spMn,spMx,spFPos):null,1);
-    setRes('sp-r-res',valid(spMn,spMx)?fromMin(spMn,spMx,spRPos):null,1);
+    setRes('sp-f-res',valid(spMn,spMx) && typeof spFPos !== 'undefined'?fromMin(spMn,spMx,spFPos):null,1);
+    setRes('sp-r-res',valid(spMn,spMx) && typeof spRPos !== 'undefined'?fromMin(spMn,spMx,spRPos):null,1);
     // ── ROAD BRAKE PRESSURE
     setRes('br-pres-res',100,0);
   } else if(md==='rally'){
@@ -700,10 +730,20 @@ function calc(){
       let camF=clamp(-1.25-(wf-0.5)*0.2,-1.5,-1.0);
       let camR=clamp(-0.65-(wf-0.5)*0.1,-0.8,-0.5);
       setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
-      setRes('arb-f-res',fromMin(1,65,clamp(0.28+(fw-0.5)*0.25+(wf-0.5)*0.15,0.18,0.6)),1);
-      setRes('arb-r-res',fromMin(1,65,clamp(0.40+(rw-0.5)*0.25+(wf-0.5)*0.15,0.25,0.65)),1);
-      const rbF=clamp(7.5+(fw-0.5)*1.5+(wf-0.5)*1,6.5,9);
-      const rbR=clamp(8.5+(rw-0.5)*1.5+(wf-0.5)*1,7,10);
+      const arbFPos=clamp(0.28+(fw-0.5)*0.25+(wf-0.5)*0.15,0.18,0.6);
+      const arbRPos=clamp(0.40+(rw-0.5)*0.25+(wf-0.5)*0.15,0.25,0.65);
+      setRes('arb-f-res',fromMin(1,65,arbFPos),1);
+      setRes('arb-r-res',fromMin(1,65,arbRPos),1);
+      const spWeightF=0.40+(fw-0.5)*0.25+(wf-0.5)*0.10;
+      const spWeightR=0.40+(rw-0.5)*0.25+(wf-0.5)*0.10;
+      const spArbInvF=0.5-(arbFPos-0.5);
+      const spArbInvR=0.5-(arbRPos-0.5);
+      spFPos=clamp(spWeightF*0.6+spArbInvF*0.4,0.28,0.55);
+      spRPos=clamp(spWeightR*0.6+spArbInvR*0.4,0.28,0.55);
+      const rbFInv=7.5-(spFPos-0.40)*15;
+      const rbRInv=8.5-(spRPos-0.40)*15;
+      rbF=clamp(rbFInv+(fw-0.5)*1.5+(wf-0.5)*1,6.5,9);
+      rbR=clamp(rbRInv+(rw-0.5)*1.5+(wf-0.5)*1,7,10);
       setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
       setRes('bm-f-res',clamp(rbF*0.45,1,20),1);setRes('bm-r-res',clamp(rbR*0.45,1,20),1);
       setRes('br-bal-res',Math.round(clamp(44+(fw-0.5)*3,40,48)),0);
@@ -719,10 +759,20 @@ function calc(){
       let camF=clamp(-1.25-(wf-0.5)*0.2,-1.5,-1.0);
       let camR=clamp(-0.65-(wf-0.5)*0.1,-0.8,-0.5);
       setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
-      setRes('arb-f-res',fromMin(1,65,clamp(0.28+(fw-0.5)*0.25+(wf-0.5)*0.15,0.18,0.6)),1);
-      setRes('arb-r-res',fromMin(1,65,clamp(0.40+(rw-0.5)*0.25+(wf-0.5)*0.15,0.25,0.65)),1);
-      const rbF=clamp(7.5+(fw-0.5)*1.5+(wf-0.5)*1,6.5,9);
-      const rbR=clamp(8.5+(rw-0.5)*1.5+(wf-0.5)*1,7,10);
+      const arbFPos=clamp(0.28+(fw-0.5)*0.25+(wf-0.5)*0.15,0.18,0.6);
+      const arbRPos=clamp(0.40+(rw-0.5)*0.25+(wf-0.5)*0.15,0.25,0.65);
+      setRes('arb-f-res',fromMin(1,65,arbFPos),1);
+      setRes('arb-r-res',fromMin(1,65,arbRPos),1);
+      const spWeightF=0.40+(fw-0.5)*0.25+(wf-0.5)*0.10;
+      const spWeightR=0.40+(rw-0.5)*0.25+(wf-0.5)*0.10;
+      const spArbInvF=0.5-(arbFPos-0.5);
+      const spArbInvR=0.5-(arbRPos-0.5);
+      spFPos=clamp(spWeightF*0.6+spArbInvF*0.4,0.28,0.55);
+      spRPos=clamp(spWeightR*0.6+spArbInvR*0.4,0.28,0.55);
+      const rbFInv=7.5-(spFPos-0.40)*15;
+      const rbRInv=8.5-(spRPos-0.40)*15;
+      rbF=clamp(rbFInv+(fw-0.5)*1.5+(wf-0.5)*1,6.5,9);
+      rbR=clamp(rbRInv+(rw-0.5)*1.5+(wf-0.5)*1,7,10);
       setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
       setRes('bm-f-res',clamp(rbF*0.45,1,20),1);setRes('bm-r-res',clamp(rbR*0.45,1,20),1);
       setRes('br-bal-res',Math.round(clamp(44+(fw-0.5)*3,40,48)),0);
@@ -730,7 +780,7 @@ function calc(){
       if(valid(rhMn,rhMx)){setRes('rh-f-res',rhMx,1);setRes('rh-r-res',rhMx,1);}
       else{setRes('rh-f-res',null,1);setRes('rh-r-res',null,1);}
       aeroCalc(0.85,0.25);
-      const rAccel=Math.round(clamp(62-pw*8,55,70)); // gentler scaling than road
+      const rAccel=Math.round(clamp(62-pw*8,55,70));
       setRes('df-r-acc-res',rAccel,0);
       setRes('df-r-dec-res',25,0);
       $('df-r-acc-sub').textContent='Rally';
@@ -738,10 +788,20 @@ function calc(){
       let camF=clamp(-1.25-(wf-0.5)*0.2,-1.5,-1.0);
       let camR=clamp(-0.65-(wf-0.5)*0.1,-0.8,-0.5);
       setRes('ca-f-res',camF,1);setRes('ca-r-res',camR,1);
-      setRes('arb-f-res',fromMin(1,65,clamp(0.50+(fw-0.5)*0.15+(wf-0.5)*0.1,0.35,0.75)),1);
-      setRes('arb-r-res',fromMin(1,65,clamp(0.30+(rw-0.5)*0.15+(wf-0.5)*0.1,0.18,0.55)),1);
-      const rbF=clamp(7.5+(fw-0.5)*1.5+(wf-0.5)*1,6.5,9);
-      const rbR=clamp(8.5+(rw-0.5)*1.5+(wf-0.5)*1,7,10);
+      const arbFPos=clamp(0.50+(fw-0.5)*0.15+(wf-0.5)*0.1,0.35,0.75);
+      const arbRPos=clamp(0.30+(rw-0.5)*0.15+(wf-0.5)*0.1,0.18,0.55);
+      setRes('arb-f-res',fromMin(1,65,arbFPos),1);
+      setRes('arb-r-res',fromMin(1,65,arbRPos),1);
+      const spWeightF=0.40+(fw-0.5)*0.25+(wf-0.5)*0.10;
+      const spWeightR=0.40+(rw-0.5)*0.25+(wf-0.5)*0.10;
+      const spArbInvF=0.5-(arbFPos-0.5);
+      const spArbInvR=0.5-(arbRPos-0.5);
+      spFPos=clamp(spWeightF*0.6+spArbInvF*0.4,0.28,0.55);
+      spRPos=clamp(spWeightR*0.6+spArbInvR*0.4,0.28,0.55);
+      const rbFInv=7.5-(spFPos-0.40)*15;
+      const rbRInv=8.5-(spRPos-0.40)*15;
+      rbF=clamp(rbFInv+(fw-0.5)*1.5+(wf-0.5)*1,6.5,9);
+      rbR=clamp(rbRInv+(rw-0.5)*1.5+(wf-0.5)*1,7,10);
       setRes('rb-f-res',clamp(rbF,1,20),1);setRes('rb-r-res',clamp(rbR,1,20),1);
       setRes('bm-f-res',clamp(rbF*0.45,1,20),1);setRes('bm-r-res',clamp(rbR*0.45,1,20),1);
       setRes('br-bal-res',Math.round(clamp(44+(fw-0.5)*3,40,48)),0);
@@ -753,12 +813,10 @@ function calc(){
     } else {
       ['ca-f-res','ca-r-res','arb-f-res','arb-r-res','rb-f-res','rb-r-res','bm-f-res','bm-r-res','br-bal-res','rh-f-res','rh-r-res','ae-f-res','ae-r-res'].forEach(id=>setRes(id,null,1));
     }
-    // ── RALLY SPRINGS (softer than road, 40% baseline)
+    // ── RALLY SPRINGS (use drivetrain-calculated positions with ARB-complement)
     const spMn=vn('sp-min'),spMx=vn('sp-max');
-    const spFPos=clamp(0.40+(fw-0.5)*0.25+(wf-0.5)*0.10,0.28,0.55);
-    const spRPos=clamp(0.40+(rw-0.5)*0.25+(wf-0.5)*0.10,0.28,0.55);
-    setRes('sp-f-res',valid(spMn,spMx)?fromMin(spMn,spMx,spFPos):null,1);
-    setRes('sp-r-res',valid(spMn,spMx)?fromMin(spMn,spMx,spRPos):null,1);
+    setRes('sp-f-res',valid(spMn,spMx) && typeof spFPos !== 'undefined'?fromMin(spMn,spMx,spFPos):null,1);
+    setRes('sp-r-res',valid(spMn,spMx) && typeof spRPos !== 'undefined'?fromMin(spMn,spMx,spRPos):null,1);
     // ── RALLY BRAKE PRESSURE (lower to prevent lockup on loose dirt)
     setRes('br-pres-res',75,0);
   }
